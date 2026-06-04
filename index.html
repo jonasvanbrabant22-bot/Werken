@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Werf Dashboard</title>
+
+<style>
+body { font-family: Arial; margin: 10px; background:#f2f2f2; }
+.card {
+  background:white;
+  padding:12px;
+  margin-bottom:10px;
+  border-radius:8px;
+  box-shadow:0 2px 5px rgba(0,0,0,0.1);
+}
+button { padding:8px; margin-top:5px; }
+input, select { width:100%; padding:8px; margin-bottom:10px; }
+.hidden { display:none; }
+.header { display:flex; justify-content:space-between; }
+</style>
+</head>
+
+<body>
+
+<div class="header">
+  <h2>Werven</h2>
+  <button onclick="openSettings()">⚙️</button>
+</div>
+
+<input type="text" id="search" placeholder="Zoek straat..." oninput="filterData()">
+
+<select id="gemeenteFilter" onchange="filterData()">
+  <option value="">Alle gemeentes</option>
+</select>
+
+<div id="list"></div>
+
+<div id="detail" class="hidden"></div>
+
+<div id="settings" class="hidden">
+  <h3>Instellingen</h3>
+  <label>Gemeentes volgen (komma gescheiden)</label>
+  <input id="gemeentesInput">
+  <button onclick="saveSettings()">Opslaan</button>
+</div>
+
+<script>
+
+// ===== TEST DATA (later vervangen door Excel koppeling) =====
+let data = [
+  {
+    DNW: "20304200",
+    gemeente: "Leuven",
+    straat: "Diestsestraat",
+    act: "Werk",
+    omschrijving: "Voorbeeld",
+    start: "2026-06-10",
+    einde: "2026-06-20",
+    koppeling: "2026-06-15",
+    s4: "6000021699"
+  }
+];
+
+// ===== INIT =====
+function init() {
+  loadGemeentes();
+  render();
+}
+
+// ===== FILTER =====
+function filterData() {
+  let zoek = document.getElementById("search").value.toLowerCase();
+  let gemeente = document.getElementById("gemeenteFilter").value;
+
+  let gefilterd = data.filter(d =>
+    (d.straat.toLowerCase().includes(zoek)) &&
+    (!gemeente || d.gemeente === gemeente)
+  );
+
+  render(gefilterd);
+}
+
+// ===== SORT (op startdatum) =====
+function sortData(arr) {
+  return arr.sort((a,b)=> new Date(a.start) - new Date(b.start));
+}
+
+// ===== RENDER LIST =====
+function render(list = data) {
+
+  list = sortData(list);
+
+  let container = document.getElementById("list");
+  container.innerHTML = "";
+
+  list.forEach(d => {
+    let div = document.createElement("div");
+    div.className = "card";
+
+    div.innerHTML = `
+      <b>${d.gemeente}</b><br>
+      ${d.straat}<br>
+      Start: ${d.start}<br>
+      DNW: ${d.DNW}<br>
+      <button onclick='showDetail(${JSON.stringify(d)})'>Open</button>
+    `;
+
+    container.appendChild(div);
+  });
+}
+
+// ===== DETAIL VIEW =====
+function showDetail(d) {
+  document.getElementById("list").classList.add("hidden");
+
+  let div = document.getElementById("detail");
+  div.classList.remove("hidden");
+
+  div.innerHTML = `
+    <button onclick="back()">⬅ terug</button>
+    <h3>${d.straat}</h3>
+    Gemeente: ${d.gemeente}<br>
+    DNW: ${d.DNW}<br><br>
+
+    Act: ${d.act}<br>
+    ${d.omschrijving}<br><br>
+
+    Start: ${d.start}<br>
+    Einde: ${d.einde}<br>
+    Koppeling: ${d.koppeling}<br><br>
+
+    <button onclick="openS4('${d.s4}')">Open S4</button>
+  `;
+}
+
+// ===== TERUG =====
+function back() {
+  document.getElementById("detail").classList.add("hidden");
+  document.getElementById("list").classList.remove("hidden");
+}
+
+// ===== S4 LINK =====
+function openS4(num) {
+  window.open(`https://xecm.fluvius.be/otcs/llisapi.dll/app/search?q=${num}`);
+}
+
+// ===== INSTELLINGEN =====
+function openSettings() {
+  document.getElementById("settings").classList.toggle("hidden");
+}
+
+function saveSettings() {
+  let val = document.getElementById("gemeentesInput").value;
+  localStorage.setItem("gemeentes", val);
+  alert("Opgeslagen!");
+}
+
+// ===== GEMEENTES LADEN =====
+function loadGemeentes() {
+  let unieke = [...new Set(data.map(d => d.gemeente))];
+
+  let select = document.getElementById("gemeenteFilter");
+
+  unieke.forEach(g => {
+    let opt = document.createElement("option");
+    opt.value = g;
+    opt.textContent = g;
+    select.appendChild(opt);
+  });
+}
+
+init();
+</script>
+
+</body>
+</html>
