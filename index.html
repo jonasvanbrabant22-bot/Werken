@@ -1,12 +1,12 @@
 <!DOCTYPE html>
 <html lang="nl">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Werf Dashboard</title>
 
 <style>
-body { font-family: Arial; margin: 10px; background:#f2f2f2; }
+body { font-family: Arial; background:#f2f2f2; margin:10px; }
 .card {
   background:white;
   padding:12px;
@@ -14,25 +14,27 @@ body { font-family: Arial; margin: 10px; background:#f2f2f2; }
   border-radius:8px;
   box-shadow:0 2px 5px rgba(0,0,0,0.1);
 }
-button { padding:8px; margin-top:5px; }
+button { padding:8px; margin:4px 0; }
 input, select { width:100%; padding:8px; margin-bottom:10px; }
 .hidden { display:none; }
 .header { display:flex; justify-content:space-between; }
 </style>
-</head>
 
+</head>
 <body>
 
 <div class="header">
   <h2>Werven</h2>
-  <button onclick="openSettings()">⚙️</button>
+  <button onclick="toggleSettings()">⚙️</button>
 </div>
 
-<input type="text" id="search" placeholder="Zoek straat..." oninput="filterData()">
+<input id="search" placeholder="Zoek straat..." oninput="filterData()">
 
 <select id="gemeenteFilter" onchange="filterData()">
   <option value="">Alle gemeentes</option>
 </select>
+
+<button onclick="loadCSV()">📂 Laad CSV (Excel export)</button>
 
 <div id="list"></div>
 
@@ -40,32 +42,72 @@ input, select { width:100%; padding:8px; margin-bottom:10px; }
 
 <div id="settings" class="hidden">
   <h3>Instellingen</h3>
-  <label>Gemeentes volgen (komma gescheiden)</label>
-  <input id="gemeentesInput">
+  <input id="gemeentesInput" placeholder="bv Leuven,Zaventem">
   <button onclick="saveSettings()">Opslaan</button>
 </div>
 
 <script>
 
-// ===== TEST DATA (later vervangen door Excel koppeling) =====
-let data = [
-  {
-    DNW: "20304200",
-    gemeente: "Leuven",
-    straat: "Diestsestraat",
-    act: "Werk",
-    omschrijving: "Voorbeeld",
-    start: "2026-06-10",
-    einde: "2026-06-20",
-    koppeling: "2026-06-15",
-    s4: "6000021699"
-  }
-];
+let data = [];
 
-// ===== INIT =====
-function init() {
-  loadGemeentes();
+// ===== CSV INLADEN =====
+function loadCSV() {
+  let input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.csv';
+
+  input.onchange = e => {
+    let file = e.target.files[0];
+    let reader = new FileReader();
+
+    reader.onload = function(event) {
+      parseCSV(event.target.result);
+    };
+
+    reader.readAsText(file);
+  };
+
+  input.click();
+}
+
+// ===== CSV PARSE =====
+function parseCSV(text) {
+  let rows = text.split("\n").map(r => r.split(";"));
+
+  let headers = rows[0];
+
+  data = rows.slice(1).map(r => {
+    return {
+      DNW: r[0],
+      gemeente: r[1],
+      straat: r[2],
+      act: r[4],
+      omschrijving: r[5],
+      start: formatDate(r[6]),
+      einde: formatDate(r[7]),
+      s4: extractS4(r.join(" "))
+    };
+  });
+
+  initFilters();
   render();
+}
+
+// ===== DATUM FIX =====
+function formatDate(d) {
+  if (!d) return "";
+  return d.substring(0,10);
+}
+
+// ===== S4 NUMMER EXTRACT =====
+function extractS4(text) {
+  let match = text.match(/6000\d+/);
+  return match ? match[0] : "";
+}
+
+// ===== SORT =====
+function sortData(arr) {
+  return arr.sort((a,b)=> new Date(a.start) - new Date(b.start));
 }
 
 // ===== FILTER =====
@@ -74,19 +116,14 @@ function filterData() {
   let gemeente = document.getElementById("gemeenteFilter").value;
 
   let gefilterd = data.filter(d =>
-    (d.straat.toLowerCase().includes(zoek)) &&
+    d.straat?.toLowerCase().includes(zoek) &&
     (!gemeente || d.gemeente === gemeente)
   );
 
   render(gefilterd);
 }
 
-// ===== SORT (op startdatum) =====
-function sortData(arr) {
-  return arr.sort((a,b)=> new Date(a.start) - new Date(b.start));
-}
-
-// ===== RENDER LIST =====
+// ===== RENDER =====
 function render(list = data) {
 
   list = sortData(list);
@@ -110,16 +147,17 @@ function render(list = data) {
   });
 }
 
-// ===== DETAIL VIEW =====
+// ===== DETAIL =====
 function showDetail(d) {
   document.getElementById("list").classList.add("hidden");
-
   let div = document.getElementById("detail");
+
   div.classList.remove("hidden");
 
   div.innerHTML = `
     <button onclick="back()">⬅ terug</button>
     <h3>${d.straat}</h3>
+
     Gemeente: ${d.gemeente}<br>
     DNW: ${d.DNW}<br><br>
 
@@ -127,40 +165,31 @@ function showDetail(d) {
     ${d.omschrijving}<br><br>
 
     Start: ${d.start}<br>
-    Einde: ${d.einde}<br>
-    Koppeling: ${d.koppeling}<br><br>
+    Einde: ${d.einde}<br><br>
 
     <button onclick="openS4('${d.s4}')">Open S4</button>
-  `;
-}
-
-// ===== TERUG =====
+    <br><br>
+    <a href="https://xecm.fluvius.be" target="_blank==== TERUG =====
 function back() {
   document.getElementById("detail").classList.add("hidden");
   document.getElementById("list").classList.remove("hidden");
 }
 
-// ===== S4 LINK =====
+// ===== S4 =====
 function openS4(num) {
-  window.open(`https://xecm.fluvius.be/otcs/llisapi.dll/app/search?q=${num}`);
+  if (!num) {
+    alert("Geen S4 nummer gevonden");
+    return;
+  }
+  window.open(`https://xecm.fluvius.be/otcs/llisapi.dll/app/search?q=${num}`, "_blank");
 }
 
-// ===== INSTELLINGEN =====
-function openSettings() {
-  document.getElementById("settings").classList.toggle("hidden");
-}
-
-function saveSettings() {
-  let val = document.getElementById("gemeentesInput").value;
-  localStorage.setItem("gemeentes", val);
-  alert("Opgeslagen!");
-}
-
-// ===== GEMEENTES LADEN =====
-function loadGemeentes() {
+// ===== FILTERS =====
+function initFilters() {
   let unieke = [...new Set(data.map(d => d.gemeente))];
-
   let select = document.getElementById("gemeenteFilter");
+
+  select.innerHTML = '<option value="">Alle gemeentes</option>';
 
   unieke.forEach(g => {
     let opt = document.createElement("option");
@@ -170,7 +199,17 @@ function loadGemeentes() {
   });
 }
 
-init();
+// ===== INSTELLINGEN =====
+function toggleSettings() {
+  document.getElementById("settings").classList.toggle("hidden");
+}
+
+function saveSettings() {
+  let val = document.getElementById("gemeentesInput").value;
+  localStorage.setItem("gemeentes", val);
+  alert("Opgeslagen");
+}
+
 </script>
 
 </body>
